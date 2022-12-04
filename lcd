@@ -1,0 +1,222 @@
+# incluir  < stdio.h >
+# incluir  " pico/stdlib.h "
+
+/* Estructura para el LCD */
+ estructura typedef {
+  uint8_t rs;		/* GPIO de RS */
+  uint8_t es;		/* GPIO de ES */
+  uint8_t d4;		/* GPIO de D4 */
+  uint8_t d5;		/* GPIO de D5 */
+  uint8_t d6;		/* GPIO de D6 */
+  uint8_t d7;		/* GPIO de D7 */
+} lcd_t ;
+
+/* Funciones en línea */
+
+/* Genera una estructura por defecto para el LCD */
+estático  en línea  lcd_t  lcd_get_default_config ( vacío ) {
+  lcd_t lcd = { 0 , 1 , 2 , 3 , 4 , 5 };
+  volver lcd;
+}
+
+/* Obtiene la mascara de pines de datos */
+estático  en línea  uint32_t  lcd_get_data_mask ( lcd_t lcd) {
+  devolver  1 << lcd. d4 | 1 <<lcd. d5 | 1 <<lcd. d6 | 1 <<lcd. d7 ;
+}
+
+/* Obtiene la mascara de pines conectada al LCD */
+estático  en línea  uint32_t  lcd_get_mask ( lcd_t lcd) {
+  devolver  1 << lcd. rs | 1 <<lcd. es | lcd_get_data_mask (lcd);
+}
+
+/* Prototipos de funciones */
+vacío  lcd_init ( lcd_t lcd);
+void  lcd_put_nibble ( lcd_t lcd, uint8_t nibble);
+vacío  lcd_put_command ( lcd_t lcd, uint8_t cmd);
+vacío  lcd_putc ( lcd_t lcd, char c);
+void  lcd_puts ( lcd_t lcd, const  char * str);
+vacío  lcd_clear ( lcd_t lcd);
+vacío  lcd_go_to_xy ( lcd_t lcd, uint8_t x,   uint8_t y);
+
+/* Programa principal */
+
+int  principal () {
+	/* Inicializa el USB */
+  stdio_init_all ();
+  /* Obtengo una variable para elegir los pines del LCD */
+  lcd_t lcd = lcd_get_default_config ();
+	/* Por defecto, hijo de los pines:
+	 	-GP0 (RS)
+		- GP1 (ES)
+		-GP2 (D4)
+		-GP3 (D5)
+		-GP4 (D6)
+		-GP5 (D7)
+		
+		Si quieren cambiar alguno pueden hacerlo como lcd.d5 = 6 por ejemplo */
+  lcd_iniciar (lcd);
+  char str[]= " HOLA MUNDO! xdddddddddddddd " ;
+  char x [ 16 ];
+	uint8_t j = 0 ;
+  mientras ( verdadero )
+  {
+		lcd_claro (lcd);
+	  lcd_puts (lcd, cadena);
+    para ( int i= 0 ; i< 16 ; i++){
+			printf ( " %c \n " ,cadena[i]);
+			x[i]=cadena[i+j];
+ 		 }
+			j++;
+			lcd_claro (lcd);
+      lcd_puts (lcd, x);
+			dormir_ms ( 500 );
+  }
+}
+
+/* Ignorar todo lo de abajo. Son las funciones que pueden usar */
+
+/*
+* @brief Inicializar LCD con configuración predeterminada
+* @param lcd: estructura a un LCD
+ */
+vacío  lcd_init ( lcd_t lcd) {
+  /* Obtener máscara pin */
+  máscara uint32_t = lcd_get_mask (lcd);
+  /* Inicializar pines GPIO */
+  gpio_init_mask (máscara);
+  /* Establecer la dirección de los pines como salida */
+  gpio_set_dir_out_masked (máscara);
+	/* Conjunto de funciones: longitud de interfaz de 8 bits */
+	lcd_put_comando (lcd, 0x03 );
+	/* Espere 4.1 ms */
+	dormir_ms ( 5 );
+	/* Conjunto de funciones: longitud de interfaz de 8 bits */
+	lcd_put_comando (lcd, 0x03 );
+	/* Espera por 100 us */
+	dormir_nosotros ( 100 );
+	/* Conjunto de funciones: longitud de interfaz de 8 bits */
+	lcd_put_comando (lcd, 0x03 );
+	/* Ahora se pueden enviar las otras instrucciones */
+
+	/* Conjunto de funciones: establece la interfaz a una longitud de 4 bits */
+	lcd_put_comando (lcd, 0x02 );
+	/* Conjunto de funciones: la interfaz tiene una longitud de 4 bits */
+	lcd_put_comando (lcd, 0x02 );
+  /* Conjunto de funciones: pantalla de dos filas y fuente de 5x7 */
+  lcd_put_command (lcd, 0x08 | ( falso << 2 ));
+  /* Pantalla encendida, cursor apagado, parpadeo apagado */
+  lcd_put_comando (lcd, 0x00 );
+  lcd_put_command (lcd, ( 3 << 2 ) | ( falso ) | falso );
+  /* Comando de configuración de entrada: incrementar el cursor */
+  lcd_put_comando (lcd, 0x00 );
+  lcd_put_comando (lcd, 0x06 );
+}
+
+/*
+* @brief Escriba un nuevo mordisco en pines de datos
+* @param lcd: estructura de pines LCD
+* @param nibble: datos de cuatro bits
+ */
+vacío  lcd_put ( lcd_t lcd, uint8_t nibble) {
+  /* Obtener máscara de pines de datos */
+  máscara uint32_t = lcd_get_data_mask (lcd);
+	/* Obtener valor de nibble */
+	uint32_t value = ((nibble & 0x8 )? true : false ) << lcd. d7 |
+										((nibble & 0x4 )? verdadero : falso ) << lcd. d6 |
+										((nibble & 0x2 )? verdadero : falso ) << lcd. d5 |
+										((nibble & 0x1 )? verdadero : falso ) << lcd. d4 ;
+  /* Enviar nibble */
+  gpio_put_masked (máscara, valor);
+	/* Establecer pin de habilitación */
+	gpio_put (lcd. es , verdadero );
+	/* Espera 40 us */
+	dormir_nosotros ( 40 );
+	/* Borrar pin de habilitación */
+	gpio_put (lcd. en , falso );
+}
+
+/*
+* @brief Escriba un nuevo comando en pines de datos
+* @param lcd: estructura de pines LCD
+* @param cmd: comando de cuatro bits
+ */
+vacío  lcd_put_command ( lcd_t lcd, uint8_t cmd) {
+	/* Borrar pin rs */
+	gpio_put (lcd. rs , falso );
+	/* Poner comando en pines de datos */
+	lcd_put (lcd, cmd);
+}
+
+/*
+* @brief Escriba un nuevo carácter en pines de datos
+* @param lcd: estructura de pines LCD
+* @param c: carácter a enviar
+ */
+vacío  lcd_putc ( lcd_t lcd, char c) {
+	/* Establecer pin rs */
+	gpio_put (lcd. rs , verdadero );
+	/* Repetir dos veces */
+	for ( uint8_t mordisco = 0 ; mordisco < 2 ; mordisco++) {
+		/* Enviar nibble inferior si es la primera vez. Enviar mordisco más alto si es segundo */
+		uint8_t n = (mordisco)? c & 0x0f : c >> 4 ;
+		/* Escribir nibble */
+		poner_lcd (lcd, n);
+	}
+}
+
+/*
+* @brief Escribe una nueva cadena en LCD
+* @param lcd: estructura de pines LCD
+* @param str: cadena a enviar
+ */
+void  lcd_puts ( lcd_t lcd, const  char * str) {
+	/* Bucle intul caracter nulo */
+	mientras (*cadena) {
+		/* Escribe el caracter */
+		lcd_putc (lcd, *cadena);
+		/* Puntero de incremento */
+		cadena++;
+	}
+}
+
+/*
+* @brief Borrar pantalla
+* @param lcd: estructura de pines LCD
+ */
+vacío  lcd_clear ( lcd_t lcd) {
+	/* Enviar comando de borrado: primer mordisco */
+	lcd_put_comando (lcd, 0x00 );
+	/* Enviar comando de borrado: segundo mordisco */
+	lcd_put_comando (lcd, 0x01 );
+	/* Espera 4ms */
+	dormir_ms ( 4 );
+}
+
+/*
+* @brief Ir a la coordenada inicial
+* @param lcd: estructura de pines LCD
+* @param x: número de columna (a partir de 0)
+* @param y: número de fila (a partir de 0)
+ */
+vacío  lcd_go_to_xy ( lcd_t lcd, uint8_t x, uint8_t y) {
+	/* variable auxiliar */
+	uint8_t auxiliar;
+	/* Comprobar si la primera fila (0) es obligatoria */
+	si (y == 0 ) {
+		/* Establecer dirección */
+		auxiliar = 0x40 + x;
+		/* Enviar primer mordisco */
+		lcd_put_command (lcd, auxiliar >> 4 );
+		/* Enviar segundo byte */
+		lcd_put_command (lcd, auxiliar y 0x0F );
+	}
+	/* Verificar si la segunda fila (2) es requerida   */
+	si  no (y == 1 ) {
+		/* Establecer dirección */
+		auxiliar = 0xC0 + x;;
+		/* Enviar primer mordisco */
+		lcd_put_command (lcd, auxiliar >> 4 );
+		/* Fin del segundo mordisco */
+		lcd_put_command (lcd, auxiliar y 0x0F );
+	}
+}
